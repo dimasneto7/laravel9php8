@@ -1,73 +1,75 @@
-version: "3.7"
+version: "3.8"
 
 services:
-    # image project
+    # custom image
     app:
-        container_name: especializati-laravel-9
         build:
-            context: .
+            args:
+                user: dimas
+                uid: 1000
+            context: ./
             dockerfile: Dockerfile
-        image: especializati/laravel9-app
-        restart: unless-stopped
+        image: especializa/laravel-app
         working_dir: /var/www/
         volumes:
-            - ./:/var/www
-        depends_on: 
-            - redis
-        networks: 
-            - laravel-9
-    
-    # nginx
-    nginx:
-        container_name: especializati-nginx
-        image: nginx:alpine
+            - ./:/var/www/
         restart: unless-stopped
-        ports: 
-            - "8989:80"
-        volumes: 
+        depends_on:
+            - redis
+            - queue
+        networks:
+            - docker-laravel
+
+    #nginx
+    nginx:
+        image: nginx:alpine
+        restart: always
+        ports:
+            - 81:80
+        volumes:
             - ./:/var/www
             - ./docker/nginx/:/etc/nginx/conf.d/
-        networks: 
-            - laravel-9
-
-    # db mysql
+        networks:
+            - docker-laravel
+    # db
     mysql:
-        container_name: especializati-mysql
         image: mysql:5.7.22
-        restart: unless-stopped
-        environment: 
+        restart: always
+        ports:
+            - 3308:3306
+        volumes:
+            - ./.docker/mysql:/var/lib/mysql
+        environment:
             MYSQL_DATABASE: ${DB_DATABASE}
             MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
-            MYSQL_PASSWORD: ${DB_PASSWORD}
             MYSQL_USER: ${DB_USERNAME}
-        volumes: 
-            - ./.docker/mysql/dbdata:/var/lib/mysql
-        ports: 
-            - "3388:3306"
-        networks: 
-            - laravel-9
-
-    # queue
-    queue:
-        container_name: especializati-queue
-        image: especializati/laravel9-app
-        restart: unless-stopped
-        command: "php artisan queue:work"
-        volumes: 
-            - ./:/var/www
-        depends_on: 
-            - redis
-            - app
-        networks: 
-            - laravel-9
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+        networks:
+            - docker-laravel
 
     # redis
     redis:
-        container_name: especializati-redis
         image: redis:latest
-        networks: 
-            - laravel-9
+        networks:
+            - docker-laravel
 
-networks: 
-    laravel-9:
+    # queue
+    queue:
+        build:
+            args:
+                user: dimas
+                uid: 1000
+            context: ./
+            dockerfile: Dockerfile
+        restart: always
+        command: "php artisan queue:work"
+        volumes:
+            - ./:/var/www/
+        depends_on:
+            - redis
+        networks:
+            - docker-laravel
+
+networks:
+    docker-laravel:
         driver: bridge
